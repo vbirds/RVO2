@@ -249,7 +249,8 @@ Agent::Agent()
       neighborDist_(0.0F),
       radius_(0.0F),
       timeHorizon_(0.0F),
-      timeHorizonObst_(0.0F) {}
+      timeHorizonObst_(0.0F),
+      needDelete_(false) {}
 
 Agent::~Agent() {}
 

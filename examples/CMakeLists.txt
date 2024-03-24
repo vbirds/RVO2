@@ -34,6 +34,9 @@
 # <https://gamma.cs.unc.edu/RVO2/>
 #
 
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 if(BUILD_TESTING)
   option(OUTPUT_TIME_AND_POSITIONS "Output time and positions" ON)
 

@@ -122,6 +122,7 @@ class Agent {
   float radius_;
   float timeHorizon_;
   float timeHorizonObst_;
+  bool needDelete_;
 
   friend class KdTree;
   friend class RVOSimulator;

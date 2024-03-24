@@ -41,6 +41,7 @@
 
 #include <cstddef>
 #include <vector>
+#include <unordered_map>
 
 #include "Export.h"
 
@@ -244,6 +245,18 @@ class RVO_EXPORT RVOSimulator {
                        std::size_t maxNeighbors, float timeHorizon,
                        float timeHorizonObst, float radius, float maxSpeed,
                        const Vector2 &velocity);
+
+  /**
+   * @brief Delete agent
+   * @param[in] agentNo
+   */
+  void delAgetent(std::size_t agentNo);
+
+  /**
+   * @brief Remove deleted flag Agent
+   */
+  void updateDeleteAgent();
+
 
   /**
    * @brief     Adds a new obstacle to the simulation.
@@ -652,12 +665,20 @@ class RVO_EXPORT RVOSimulator {
   /* Not implemented. */
   RVOSimulator &operator=(const RVOSimulator &other);
 
+  void onAddAgent();
+  void onDelAgent();
+
+
+  std::unordered_map<std::size_t, int> agentNo2indexDict_;
+  std::unordered_map<int, std::size_t> index2agentNoDict_;
+
   std::vector<Agent *> agents_;
   std::vector<Obstacle *> obstacles_;
   Agent *defaultAgent_;
   KdTree *kdTree_;
   float globalTime_;
   float timeStep_;
+  std::size_t totalID_;
 
   friend class KdTree;
 };
