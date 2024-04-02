@@ -123,6 +123,7 @@ class Agent {
   float timeHorizon_;
   float timeHorizonObst_;
   bool needDelete_;
+  bool isMoving_;
 
   friend class KdTree;
   friend class RVOSimulator;

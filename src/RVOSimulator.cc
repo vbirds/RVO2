@@ -113,7 +113,7 @@ std::size_t RVOSimulator::addAgent(const Vector2 &position) {
     Agent *const agent = new Agent();
     agent->position_ = position;
     agent->velocity_ = defaultAgent_->velocity_;
-    agent->id_ = totalID_++;
+    agent->id_ = ++totalID_;
     agent->maxNeighbors_ = defaultAgent_->maxNeighbors_;
     agent->maxSpeed_ = defaultAgent_->maxSpeed_;
     agent->neighborDist_ = defaultAgent_->neighborDist_;
@@ -143,7 +143,7 @@ std::size_t RVOSimulator::addAgent(const Vector2 &position, float neighborDist,
   Agent *const agent = new Agent();
   agent->position_ = position;
   agent->velocity_ = velocity;
-  agent->id_ = totalID_++;
+  agent->id_ = ++totalID_;
   agent->maxNeighbors_ = maxNeighbors;
   agent->maxSpeed_ = maxSpeed;
   agent->neighborDist_ = neighborDist;
@@ -156,7 +156,10 @@ std::size_t RVOSimulator::addAgent(const Vector2 &position, float neighborDist,
 }
 
 void RVOSimulator::delAgetent(std::size_t agentNo) {
-  agents_[agentNo]->needDelete_ = true;
+  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
+  if (it != agentNo2indexDict_.end()) {
+    agents_[it->second]->needDelete_ = true;
+  }
 }
 
 void RVOSimulator::updateDeleteAgent() {
@@ -500,6 +503,13 @@ void RVOSimulator::onDelAgent() {
     index2agentNoDict_.insert(std::make_pair(i, agentNo));
   }
 
+}
+
+void RVOSimulator::setIsMoving(std::size_t agentNo, bool isMoving) {
+    std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
+    if (it != agentNo2indexDict_.end()) {
+      agents_[it->second]->isMoving_ = isMoving;
+    }
 }
 
 } /* namespace RVO */

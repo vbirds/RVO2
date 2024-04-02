@@ -658,6 +658,8 @@ class RVO_EXPORT RVOSimulator {
    */
   void setTimeStep(float timeStep) { timeStep_ = timeStep; }
 
+  void setIsMoving(std::size_t agentNo, bool isMoving);
+
  private:
   /* Not implemented. */
   RVOSimulator(const RVOSimulator &other);

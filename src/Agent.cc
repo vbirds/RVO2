@@ -250,7 +250,8 @@ Agent::Agent()
       radius_(0.0F),
       timeHorizon_(0.0F),
       timeHorizonObst_(0.0F),
-      needDelete_(false) {}
+      needDelete_(false),
+      isMoving_(false){}
 
 Agent::~Agent() {}
 
@@ -605,7 +606,8 @@ void Agent::computeNewVelocity(float timeStep) {
       u = (combinedRadius * invTimeStep - wLength) * unitW;
     }
 
-    line.point = velocity_ + 0.5F * u;
+    float t = other->isMoving_ ? 0.5F : 1.0F;
+    line.point = velocity_ + t * u;
     orcaLines_.push_back(line);
   }
 
