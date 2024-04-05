@@ -670,9 +670,7 @@ class RVO_EXPORT RVOSimulator {
   void onAddAgent();
   void onDelAgent();
 
-
   std::unordered_map<std::size_t, int> agentNo2indexDict_;
-  std::unordered_map<int, std::size_t> index2agentNoDict_;
 
   std::vector<Agent *> agents_;
   std::vector<Obstacle *> obstacles_;

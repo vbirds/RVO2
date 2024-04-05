@@ -490,17 +490,14 @@ void RVOSimulator::onAddAgent() {
   int index = static_cast<int>(agents_.size() - 1);
   std::size_t agentNo = agents_[index]->id_;
   agentNo2indexDict_.insert(std::make_pair(agentNo, index));
-  index2agentNoDict_.insert(std::make_pair(index, agentNo));
 }
 
 void RVOSimulator::onDelAgent() {
   agentNo2indexDict_.clear();
-  index2agentNoDict_.clear();
 
   for (int i = 0; i < static_cast<int>(agents_.size()); ++i) {
     std::size_t agentNo = agents_[i]->id_;
     agentNo2indexDict_.insert(std::make_pair(agentNo, i));
-    index2agentNoDict_.insert(std::make_pair(i, agentNo));
   }
 
 }
