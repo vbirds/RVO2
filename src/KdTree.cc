@@ -171,6 +171,7 @@ void KdTree::buildAgentTree() {
                    simulator_->agents_.begin() +
                        static_cast<std::ptrdiff_t>(agents_.size()),
                    simulator_->agents_.end());
+    agentTree_.clear();
     agentTree_.resize(2U * agents_.size() - 1U);
   }
 
