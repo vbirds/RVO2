@@ -88,6 +88,7 @@ if(ENABLE_OPENMP AND OpenMP_FOUND)
   set_target_properties(${RVO_LIBRARY} PROPERTIES
     LINK_FLAGS "${OpenMP_CXX_FLAGS}")
   target_compile_options(${RVO_LIBRARY} PRIVATE ${OpenMP_CXX_FLAGS})
+  message(status "OpenMP enabled ${OpenMP_CXX_FLAGS}")
 endif()
 
 export(TARGETS ${RVO_LIBRARY} NAMESPACE ${PROJECT_NAME}::

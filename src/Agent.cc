@@ -606,8 +606,7 @@ void Agent::computeNewVelocity(float timeStep) {
       u = (combinedRadius * invTimeStep - wLength) * unitW;
     }
 
-    float t = other->isMoving_ ? 0.5F : 1.0F;
-    line.point = velocity_ + t * u;
+    line.point = velocity_ + 0.5F * u;
     orcaLines_.push_back(line);
   }
 

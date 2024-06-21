@@ -660,6 +660,8 @@ class RVO_EXPORT RVOSimulator {
 
   void setIsMoving(std::size_t agentNo, bool isMoving);
 
+  bool IsDirty() { return bDirty; }
+
  private:
   /* Not implemented. */
   RVOSimulator(const RVOSimulator &other);
@@ -671,7 +673,7 @@ class RVO_EXPORT RVOSimulator {
   void onDelAgent();
 
   std::unordered_map<std::size_t, int> agentNo2indexDict_;
-
+  std::unordered_map<int, std::size_t> index2agentNoDict_;
   std::vector<Agent *> agents_;
   std::vector<Obstacle *> obstacles_;
   Agent *defaultAgent_;
@@ -679,6 +681,7 @@ class RVO_EXPORT RVOSimulator {
   float globalTime_;
   float timeStep_;
   std::size_t totalID_;
+  bool bDirty;
 
   friend class KdTree;
 };
