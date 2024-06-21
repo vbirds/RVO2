@@ -70,7 +70,7 @@ class KdTree {
   /**
    * @brief Builds an agent k-D tree.
    */
-  void buildAgentTree();
+  void buildAgentTree(std::vector<Agent *> tempAgentVec);
 
   /**
    * @brief     Recursive function to build an agent k-D tree.

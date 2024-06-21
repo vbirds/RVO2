@@ -122,8 +122,8 @@ std::size_t RVOSimulator::addAgent(const Vector2 &position) {
     agent->radius_ = defaultAgent_->radius_;
     agent->timeHorizon_ = defaultAgent_->timeHorizon_;
     agent->timeHorizonObst_ = defaultAgent_->timeHorizonObst_;
-    agents_.push_back(agent);
-    onAddAgent();
+    agents_.emplace(agent->id_, agent);
+    bDirty = true;
     return agent->id_;
   }
 
@@ -152,31 +152,30 @@ std::size_t RVOSimulator::addAgent(const Vector2 &position, float neighborDist,
   agent->radius_ = radius;
   agent->timeHorizon_ = timeHorizon;
   agent->timeHorizonObst_ = timeHorizonObst;
-  agents_.push_back(agent);
-  onAddAgent();
+  agents_.emplace(agent->id_, agent);
+  bDirty = true;
   return agent->id_;
 }
 
 void RVOSimulator::delAgetent(std::size_t agentNo) {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    agents_[it->second]->needDelete_ = true;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    agents_[agentNo]->needDelete_ = true;
+    bDirty = true;
   }
 }
 
-void RVOSimulator::updateDeleteAgent() {
-  bool isDelete = false;
-  for (std::vector<Agent *>::iterator it = agents_.begin(); it != agents_.end(); ++it) {
-    if ((*it)->needDelete_) {
-      delete *it;
-      agents_.erase(it);
-      --it;;
-      isDelete = true;
+void RVOSimulator::updateDeleteAgent(std::vector<Agent *>  &tempAgentVec) {
+    for (auto it = agents_.begin(); it != agents_.end();) {
+      if (it->second->needDelete_) {
+        delete it->second;
+        it = agents_.erase(it);
+        bDirty = true;
+      } else {
+        tempAgentVec.emplace_back(it->second);
+        ++it;
+      }
     }
-  }
-  if (isDelete) {
-    onDelAgent();
-  }
 }
 
 std::size_t RVOSimulator::addObstacle(const std::vector<Vector2> &vertices) {
@@ -221,22 +220,26 @@ std::size_t RVOSimulator::addObstacle(const std::vector<Vector2> &vertices) {
 }
 
 void RVOSimulator::doStep() {
-  updateDeleteAgent();
-  kdTree_->buildAgentTree();
+
+  // delete agents_ needDelete_ is true
+  std::vector<Agent *> tempAgentVec;
+  updateDeleteAgent(tempAgentVec);
+
+  kdTree_->buildAgentTree(tempAgentVec);
 
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif /* _OPENMP */
-  for (int i = 0; i < static_cast<int>(agents_.size()); ++i) {
-    agents_[i]->computeNeighbors(kdTree_);
-    agents_[i]->computeNewVelocity(timeStep_);
+  for (int i = 0; i < static_cast<int>(tempAgentVec.size()); ++i) {
+    tempAgentVec[i]->computeNeighbors(kdTree_);
+    tempAgentVec[i]->computeNewVelocity(timeStep_);
   }
 
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif /* _OPENMP */
-  for (int i = 0; i < static_cast<int>(agents_.size()); ++i) {
-    agents_[i]->update(timeStep_);
+  for (int i = 0; i < static_cast<int>(tempAgentVec.size()); ++i) {
+    tempAgentVec[i]->update(timeStep_);
   }
 
   globalTime_ += timeStep_;
@@ -245,124 +248,124 @@ void RVOSimulator::doStep() {
 
 std::size_t RVOSimulator::getAgentAgentNeighbor(std::size_t agentNo,
                                                 std::size_t neighborNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->agentNeighbors_[neighborNo].second->id_;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->agentNeighbors_[neighborNo].second->id_;
   }
   return 0;
 }
 
 std::size_t RVOSimulator::getAgentMaxNeighbors(std::size_t agentNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->maxNeighbors_;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->maxNeighbors_;
   }
   return 0;
 }
 
 float RVOSimulator::getAgentMaxSpeed(std::size_t agentNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->maxSpeed_;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->maxSpeed_;
   }
   return 0;
 }
 
 float RVOSimulator::getAgentNeighborDist(std::size_t agentNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->neighborDist_;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->neighborDist_;
   }
   return 0;
 }
 
 std::size_t RVOSimulator::getAgentNumAgentNeighbors(std::size_t agentNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->agentNeighbors_.size();
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->agentNeighbors_.size();
   }
   return 0;
 }
 
 std::size_t RVOSimulator::getAgentNumObstacleNeighbors(
     std::size_t agentNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->obstacleNeighbors_.size();
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->obstacleNeighbors_.size();
   }
   return 0;
 }
 
 std::size_t RVOSimulator::getAgentNumORCALines(std::size_t agentNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->orcaLines_.size();
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->orcaLines_.size();
   }
   return 0;
 }
 
 std::size_t RVOSimulator::getAgentObstacleNeighbor(
     std::size_t agentNo, std::size_t neighborNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->obstacleNeighbors_[neighborNo].second->id_;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->obstacleNeighbors_[neighborNo].second->id_;
   }
   return 0;
 }
 
 const Line &RVOSimulator::getAgentORCALine(std::size_t agentNo,
                                            std::size_t lineNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->orcaLines_[lineNo];
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->orcaLines_[lineNo];
   }
   return Line();
 }
 
 const Vector2 &RVOSimulator::getAgentPosition(std::size_t agentNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->position_;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->position_;
   }
   return Vector2();
 }
 
 const Vector2 &RVOSimulator::getAgentPrefVelocity(std::size_t agentNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->prefVelocity_;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->prefVelocity_;
   }
   return Vector2();
 }
 
 float RVOSimulator::getAgentRadius(std::size_t agentNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->radius_;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->radius_;
   }
   return 0.0F;
 }
 
 float RVOSimulator::getAgentTimeHorizon(std::size_t agentNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->timeHorizon_;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->timeHorizon_;
   }
   return 0.0F;
 }
 
 float RVOSimulator::getAgentTimeHorizonObst(std::size_t agentNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->timeHorizonObst_;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->timeHorizonObst_;
   }
   return 0.0F;
 }
 
 const Vector2 &RVOSimulator::getAgentVelocity(std::size_t agentNo) const {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    return agents_[it->second]->velocity_;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    return it->second->velocity_;
   }
   return Vector2();
 }
@@ -418,98 +421,78 @@ void RVOSimulator::setAgentDefaults(float neighborDist,
 
 void RVOSimulator::setAgentMaxNeighbors(std::size_t agentNo,
                                         std::size_t maxNeighbors) {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end()) {
-    agents_[it->second]->maxNeighbors_ = maxNeighbors;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    it->second->maxNeighbors_ = maxNeighbors;
   }
 
 }
 
 void RVOSimulator::setAgentMaxSpeed(std::size_t agentNo, float maxSpeed) {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    agents_[it->second]->maxSpeed_ = maxSpeed;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    it->second->maxSpeed_ = maxSpeed;
   }
 }
 
 void RVOSimulator::setAgentNeighborDist(std::size_t agentNo,
                                         float neighborDist) {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    agents_[it->second]->neighborDist_ = neighborDist;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    it->second->neighborDist_ = neighborDist;
   }
 }
 
 void RVOSimulator::setAgentPosition(std::size_t agentNo,
                                     const Vector2 &position) {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    agents_[it->second]->position_ = position;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    it->second->position_ = position;
   }
 }
 
 void RVOSimulator::setAgentPrefVelocity(std::size_t agentNo,
                                         const Vector2 &prefVelocity) {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    agents_[it->second]->prefVelocity_ = prefVelocity;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    it->second->prefVelocity_ = prefVelocity;
   }
 }
 
 void RVOSimulator::setAgentRadius(std::size_t agentNo, float radius) {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    agents_[it->second]->radius_ = radius;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    it->second->radius_ = radius;
   }
 }
 
 void RVOSimulator::setAgentTimeHorizon(std::size_t agentNo, float timeHorizon) {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    agents_[it->second]->timeHorizon_ = timeHorizon;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    it->second->timeHorizon_ = timeHorizon;
   }
 }
 
 void RVOSimulator::setAgentTimeHorizonObst(std::size_t agentNo,
                                            float timeHorizonObst) {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    agents_[it->second]->timeHorizonObst_ = timeHorizonObst;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    it->second->timeHorizonObst_ = timeHorizonObst;
   }
 }
 
 void RVOSimulator::setAgentVelocity(std::size_t agentNo,
                                     const Vector2 &velocity) {
-  std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-  if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-    agents_[it->second]->velocity_ = velocity;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    it->second->velocity_ = velocity;
   }
-}
-
-void RVOSimulator::onAddAgent() {
-  if (agents_.empty()) {
-    return;
-  }
-  int index = static_cast<int>(agents_.size() - 1);
-  std::size_t agentNo = agents_[index]->id_;
-  agentNo2indexDict_.insert(std::make_pair(agentNo, index));
-  bDirty = true;
-}
-
-void RVOSimulator::onDelAgent() {
-  agentNo2indexDict_.clear();
-
-  for (int i = 0; i < static_cast<int>(agents_.size()); ++i) {
-    std::size_t agentNo = agents_[i]->id_;
-    agentNo2indexDict_.insert(std::make_pair(agentNo, i));
-  }
-  bDirty = true;
 }
 
 void RVOSimulator::setIsMoving(std::size_t agentNo, bool isMoving) {
-    std::unordered_map<std::size_t, int>::const_iterator it = agentNo2indexDict_.find(agentNo);
-    if (it != agentNo2indexDict_.end() && it->second < agents_.size()) {
-      agents_[it->second]->isMoving_ = isMoving;
+  auto it = agents_.find(agentNo);
+  if (it != agents_.end()) {
+    it->second->isMoving_ = isMoving;
     }
 }
 

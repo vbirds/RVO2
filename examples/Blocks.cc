@@ -76,7 +76,8 @@ const float RVO_TWO_PI = 6.28318530717958647692F;
 
 void setupScenario(
     RVO::RVOSimulator *simulator,
-    std::vector<RVO::Vector2> &goals) { /* NOLINT(runtime/references) */
+    std::vector<RVO::Vector2> &goals,
+    std::vector<std::size_t> & agentIDVec) { /* NOLINT(runtime/references) */
 #if RVO_SEED_RANDOM_NUMBER_GENERATOR
   std::srand(static_cast<unsigned int>(std::time(NULL)));
 #endif /* RVO_SEED_RANDOM_NUMBER_GENERATOR */
@@ -91,8 +92,9 @@ void setupScenario(
    * opposite side of the environment. */
   for (std::size_t i = 0U; i < 5U; ++i) {
     for (std::size_t j = 0U; j < 5U; ++j) {
-      simulator->addAgent(RVO::Vector2(55.0F + static_cast<float>(i) * 10.0F,
+      std::size_t id = simulator->addAgent(RVO::Vector2(55.0F + static_cast<float>(i) * 10.0F,
                                        55.0F + static_cast<float>(j) * 10.0F));
+      agentIDVec.emplace_back(id);
       goals.push_back(RVO::Vector2(-75.0F, -75.0F));
 
       simulator->addAgent(RVO::Vector2(-55.0F - static_cast<float>(i) * 10.0F,
@@ -146,13 +148,13 @@ void setupScenario(
 }
 
 #if RVO_OUTPUT_TIME_AND_POSITIONS
-void updateVisualization(RVO::RVOSimulator *simulator) {
+void updateVisualization(RVO::RVOSimulator *simulator, std::vector<std::size_t> & agentIDVec) {
   /* Output the current global time. */
   std::cout << simulator->getGlobalTime();
 
   /* Output the current position of all the agents. */
-  for (std::size_t i = 0U; i < simulator->getNumAgents(); ++i) {
-    std::cout << " " << simulator->getAgentPosition(i);
+  for (std::size_t i = 0U; i < agentIDVec.size(); ++i) {
+    std::cout << " " << simulator->getAgentPosition(agentIDVec[i]);
   }
 
   std::cout << std::endl;
@@ -160,20 +162,21 @@ void updateVisualization(RVO::RVOSimulator *simulator) {
 #endif /* RVO_OUTPUT_TIME_AND_POSITIONS */
 
 void setPreferredVelocities(RVO::RVOSimulator *simulator,
-                            const std::vector<RVO::Vector2> &goals) {
+                            const std::vector<RVO::Vector2> &goals,
+                            std::vector<std::size_t> & agentIDVec) {
   /* Set the preferred velocity to be a vector of unit magnitude (speed) in the
    * direction of the goal. */
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif /* _OPENMP */
-  for (int i = 0; i < static_cast<int>(simulator->getNumAgents()); ++i) {
-    RVO::Vector2 goalVector = goals[i] - simulator->getAgentPosition(i);
+  for (int i = 0; i < static_cast<int>(agentIDVec.size()); ++i) {
+    RVO::Vector2 goalVector = goals[i] - simulator->getAgentPosition(agentIDVec[i]);
 
     if (RVO::absSq(goalVector) > 1.0F) {
       goalVector = RVO::normalize(goalVector);
     }
 
-    simulator->setAgentPrefVelocity(i, goalVector);
+    simulator->setAgentPrefVelocity(agentIDVec[i], goalVector);
 
     /* Perturb a little to avoid deadlocks due to perfect symmetry. */
     float angle = static_cast<float>(std::rand()) * RVO_TWO_PI /
@@ -182,16 +185,17 @@ void setPreferredVelocities(RVO::RVOSimulator *simulator,
                  static_cast<float>(RAND_MAX);
 
     simulator->setAgentPrefVelocity(
-        i, simulator->getAgentPrefVelocity(i) +
+        i, simulator->getAgentPrefVelocity(agentIDVec[i]) +
                dist * RVO::Vector2(std::cos(angle), std::sin(angle)));
   }
 }
 
 bool reachedGoal(RVO::RVOSimulator *simulator,
-                 const std::vector<RVO::Vector2> &goals) {
+                 const std::vector<RVO::Vector2> &goals,
+                 std::vector<std::size_t> & agentIDVec) {
   /* Check if all agents have reached their goals. */
-  for (std::size_t i = 0U; i < simulator->getNumAgents(); ++i) {
-    if (RVO::absSq(simulator->getAgentPosition(i) - goals[i]) > 400.0F) {
+  for (std::size_t i = 0U; i < agentIDVec.size(); ++i) {
+    if (RVO::absSq(simulator->getAgentPosition(agentIDVec[i]) - goals[i]) > 400.0F) {
       return false;
     }
   }
@@ -203,21 +207,22 @@ bool reachedGoal(RVO::RVOSimulator *simulator,
 int main() {
   /* Store the goals of the agents. */
   std::vector<RVO::Vector2> goals;
+  std::vector<std::size_t> agentIDVec;
 
   /* Create a new simulator instance. */
   RVO::RVOSimulator *simulator = new RVO::RVOSimulator();
 
   /* Set up the scenario. */
-  setupScenario(simulator, goals);
+  setupScenario(simulator, goals, agentIDVec);
 
   /* Perform and manipulate the simulation. */
   do {
 #if RVO_OUTPUT_TIME_AND_POSITIONS
-    updateVisualization(simulator);
+    updateVisualization(simulator, agentIDVec);
 #endif /* RVO_OUTPUT_TIME_AND_POSITIONS */
-    setPreferredVelocities(simulator, goals);
+    setPreferredVelocities(simulator, goals, agentIDVec);
     simulator->doStep();
-  } while (!reachedGoal(simulator, goals));
+  } while (!reachedGoal(simulator, goals, agentIDVec));
 
   delete simulator;
 
