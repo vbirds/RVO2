@@ -165,10 +165,10 @@ KdTree::KdTree(RVOSimulator *simulator)
 KdTree::~KdTree() { deleteObstacleTree(obstacleTree_); }
 
 void KdTree::buildAgentTree(std::vector<Agent *> tempAgentVec) {
-  if (agents_.size() != simulator_->agents_.size() || simulator_->IsDirty()) {
+  if (agents_.size() != tempAgentVec.size() || simulator_->IsDirty()) {
     agents_.clear();
     agentTree_.clear();
-    if (simulator_->agents_.size())
+    if (tempAgentVec.size())
     {
       agents_.swap(tempAgentVec);
       agentTree_.resize(2U * agents_.size() - 1U);

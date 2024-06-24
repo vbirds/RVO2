@@ -165,17 +165,26 @@ void RVOSimulator::delAgetent(std::size_t agentNo) {
   }
 }
 
-void RVOSimulator::updateDeleteAgent(std::vector<Agent *>  &tempAgentVec) {
-    for (auto it = agents_.begin(); it != agents_.end();) {
-      if (it->second->needDelete_) {
-        delete it->second;
-        it = agents_.erase(it);
-        bDirty = true;
-      } else {
-        tempAgentVec.emplace_back(it->second);
-        ++it;
-      }
-    }
+void RVOSimulator::updateDeleteAgent(std::vector<Agent *>  &tempAgentVec, std::vector<size_t> &delAgentVec) {
+    agents_.for_each_m([&](phmap::parallel_flat_hash_map<std::size_t, Agent*>::value_type &pair) {
+        if (pair.second->needDelete_) {
+            delAgentVec.emplace_back(pair.first);
+            bDirty = true;
+        } else {
+            tempAgentVec.emplace_back(pair.second);
+        }
+    });
+
+//    for (auto it = agents_.begin(); it != agents_.end();) {
+//      if (it->second->needDelete_) {
+//        delete it->second;
+//        it = agents_.erase(it);
+//        bDirty = true;
+//      } else {
+//        tempAgentVec.emplace_back(it->second);
+//        ++it;
+//      }
+//    }
 }
 
 std::size_t RVOSimulator::addObstacle(const std::vector<Vector2> &vertices) {
@@ -223,7 +232,8 @@ void RVOSimulator::doStep() {
 
   // delete agents_ needDelete_ is true
   std::vector<Agent *> tempAgentVec;
-  updateDeleteAgent(tempAgentVec);
+  std::vector<std::size_t> delAgentVec;
+  updateDeleteAgent(tempAgentVec, delAgentVec);
 
   kdTree_->buildAgentTree(tempAgentVec);
 
@@ -240,6 +250,14 @@ void RVOSimulator::doStep() {
 #endif /* _OPENMP */
   for (int i = 0; i < static_cast<int>(tempAgentVec.size()); ++i) {
     tempAgentVec[i]->update(timeStep_);
+  }
+
+  for (auto it = delAgentVec.begin(); it != delAgentVec.end(); ++it) {
+        auto pair = agents_.find(*it);
+        if (pair != agents_.end()) {
+            delete pair->second;
+            agents_.erase(*it);
+        }
   }
 
   globalTime_ += timeStep_;

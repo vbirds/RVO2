@@ -185,7 +185,7 @@ void setPreferredVelocities(RVO::RVOSimulator *simulator,
                  static_cast<float>(RAND_MAX);
 
     simulator->setAgentPrefVelocity(
-        i, simulator->getAgentPrefVelocity(agentIDVec[i]) +
+        agentIDVec[i], simulator->getAgentPrefVelocity(agentIDVec[i]) +
                dist * RVO::Vector2(std::cos(angle), std::sin(angle)));
   }
 }

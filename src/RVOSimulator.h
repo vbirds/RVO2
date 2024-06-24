@@ -41,7 +41,7 @@
 
 #include <cstddef>
 #include <vector>
-#include <unordered_map>
+#include "parallel_hashmap/phmap.h"
 
 #include "Export.h"
 
@@ -255,7 +255,7 @@ class RVO_EXPORT RVOSimulator {
   /**
    * @brief Remove deleted flag Agent
    */
-  void updateDeleteAgent( std::vector<Agent *>  &tempAgentVec);
+  void updateDeleteAgent( std::vector<Agent *>  &tempAgentVec, std::vector<size_t> &delAgentVec);
 
 
   /**
@@ -671,7 +671,8 @@ class RVO_EXPORT RVOSimulator {
 
 //  std::unordered_map<std::size_t, int> agentNo2indexDict_;
 //  std::unordered_map<int, std::size_t> index2agentNoDict_;
-  std::unordered_map<std::size_t, Agent*> agents_;
+//  std::unordered_map<std::size_t, Agent*> agents_;
+  phmap::parallel_flat_hash_map<std::size_t, Agent*> agents_;
 //  std::vector<Agent *> agents_;
   std::vector<Obstacle *> obstacles_;
   Agent *defaultAgent_;
@@ -679,7 +680,7 @@ class RVO_EXPORT RVOSimulator {
   float globalTime_;
   float timeStep_;
   std::size_t totalID_;
-  bool bDirty;
+  std::atomic<bool> bDirty;
 
   friend class KdTree;
 };
