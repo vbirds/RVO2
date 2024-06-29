@@ -97,16 +97,19 @@ void setupScenario(
       agentIDVec.emplace_back(id);
       goals.push_back(RVO::Vector2(-75.0F, -75.0F));
 
-      simulator->addAgent(RVO::Vector2(-55.0F - static_cast<float>(i) * 10.0F,
+      id = simulator->addAgent(RVO::Vector2(-55.0F - static_cast<float>(i) * 10.0F,
                                        55.0F + static_cast<float>(j) * 10.0F));
+      agentIDVec.emplace_back(id);
       goals.push_back(RVO::Vector2(75.0F, -75.0F));
 
-      simulator->addAgent(RVO::Vector2(55.0F + static_cast<float>(i) * 10.0F,
+      id = simulator->addAgent(RVO::Vector2(55.0F + static_cast<float>(i) * 10.0F,
                                        -55.0F - static_cast<float>(j) * 10.0F));
+      agentIDVec.emplace_back(id);
       goals.push_back(RVO::Vector2(-75.0F, 75.0F));
 
-      simulator->addAgent(RVO::Vector2(-55.0F - static_cast<float>(i) * 10.0F,
+      id = simulator->addAgent(RVO::Vector2(-55.0F - static_cast<float>(i) * 10.0F,
                                        -55.0F - static_cast<float>(j) * 10.0F));
+      agentIDVec.emplace_back(id);
       goals.push_back(RVO::Vector2(75.0F, 75.0F));
     }
   }
