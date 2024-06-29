@@ -238,7 +238,7 @@ void RVOSimulator::doStep() {
   kdTree_->buildAgentTree(tempAgentVec);
 
 #ifdef _OPENMP
-#pragma omp parallel for
+//#pragma omp parallel for
 #endif /* _OPENMP */
   for (int i = 0; i < static_cast<int>(tempAgentVec.size()); ++i) {
     tempAgentVec[i]->computeNeighbors(kdTree_);
@@ -246,7 +246,7 @@ void RVOSimulator::doStep() {
   }
 
 #ifdef _OPENMP
-#pragma omp parallel for
+//#pragma omp parallel for
 #endif /* _OPENMP */
   for (int i = 0; i < static_cast<int>(tempAgentVec.size()); ++i) {
     tempAgentVec[i]->update(timeStep_);
