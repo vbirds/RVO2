@@ -41,7 +41,9 @@
 
 #include <cstddef>
 #include <vector>
-#include "parallel_hashmap/phmap.h"
+#include <atomic>
+#include <unordered_map>
+#include <mutex>
 
 #include "Export.h"
 
@@ -410,7 +412,7 @@ class RVO_EXPORT RVOSimulator {
    *                    velocity is to be retrieved.
    * @return    The present two-dimensional linear velocity of the agent.
    */
-  const Vector2 &getAgentVelocity(std::size_t agentNo) const;
+  const Vector2 &getAgentVelocity(std::size_t agentNo, bool & bIsVaild) const;
 
   /**
    * @brief  Returns the global time of the simulation.
@@ -422,7 +424,7 @@ class RVO_EXPORT RVOSimulator {
    * @brief  Returns the count of agents in the simulation.
    * @return The count of agents in the simulation.
    */
-  std::size_t getNumAgents() const { return agents_.size(); }
+  std::size_t getNumAgents() const;
 
   /**
    * @brief  Returns the count of obstacle vertices in the simulation.
@@ -671,8 +673,8 @@ class RVO_EXPORT RVOSimulator {
 
 //  std::unordered_map<std::size_t, int> agentNo2indexDict_;
 //  std::unordered_map<int, std::size_t> index2agentNoDict_;
-//  std::unordered_map<std::size_t, Agent*> agents_;
-  phmap::parallel_flat_hash_map_m<std::size_t, Agent*> agents_;
+  std::unordered_map<std::size_t, Agent*> agents_;
+  mutable std::mutex agentMutex_;
 //  std::vector<Agent *> agents_;
   std::vector<Obstacle *> obstacles_;
   Agent *defaultAgent_;

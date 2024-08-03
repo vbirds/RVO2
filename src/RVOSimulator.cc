@@ -54,6 +54,8 @@
 namespace RVO {
 const std::size_t RVO_ERROR = std::numeric_limits<std::size_t>::max();
 
+static Vector2 g_InValidVec2{0, 0};
+
 RVOSimulator::RVOSimulator()
     : defaultAgent_(NULL),
       kdTree_(new KdTree(this)),
@@ -98,16 +100,16 @@ RVOSimulator::RVOSimulator(float timeStep, float neighborDist,
 }
 
 RVOSimulator::~RVOSimulator() {
-  delete defaultAgent_;
-  delete kdTree_;
-
-  for (std::size_t i = 0U; i < agents_.size(); ++i) {
-    delete agents_[i];
-  }
-
-  for (std::size_t i = 0U; i < obstacles_.size(); ++i) {
-    delete obstacles_[i];
-  }
+//  delete defaultAgent_;
+//  delete kdTree_;
+//
+//  for (std::size_t i = 0U; i < agents_.size(); ++i) {
+//    delete agents_[i];
+//  }
+//
+//  for (std::size_t i = 0U; i < obstacles_.size(); ++i) {
+//    delete obstacles_[i];
+//  }
 }
 
 std::size_t RVOSimulator::addAgent(const Vector2 &position) {
@@ -122,7 +124,12 @@ std::size_t RVOSimulator::addAgent(const Vector2 &position) {
     agent->radius_ = defaultAgent_->radius_;
     agent->timeHorizon_ = defaultAgent_->timeHorizon_;
     agent->timeHorizonObst_ = defaultAgent_->timeHorizonObst_;
-    agents_.emplace(agent->id_, agent);
+
+    {
+      std::lock_guard<std::mutex> lock(agentMutex_);
+      agents_.emplace(agent->id_, agent);
+    }
+
     bDirty = true;
     return agent->id_;
   }
@@ -152,39 +159,44 @@ std::size_t RVOSimulator::addAgent(const Vector2 &position, float neighborDist,
   agent->radius_ = radius;
   agent->timeHorizon_ = timeHorizon;
   agent->timeHorizonObst_ = timeHorizonObst;
-  agents_.emplace(agent->id_, agent);
+  {
+    std::lock_guard<std::mutex> lock(agentMutex_);
+    agents_.emplace(agent->id_, agent);
+  }
+
   bDirty = true;
   return agent->id_;
 }
 
 void RVOSimulator::delAgetent(std::size_t agentNo) {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
-    agents_[agentNo]->needDelete_ = true;
+    it->second->needDelete_ = true;
     bDirty = true;
   }
 }
 
 void RVOSimulator::updateDeleteAgent(std::vector<Agent *>  &tempAgentVec, std::vector<size_t> &delAgentVec) {
-    agents_.for_each_m([&](phmap::parallel_flat_hash_map<std::size_t, Agent*>::value_type &pair) {
-        if (pair.second->needDelete_) {
-            delAgentVec.emplace_back(pair.first);
-            bDirty = true;
-        } else {
-            tempAgentVec.emplace_back(pair.second);
-        }
-    });
-
-//    for (auto it = agents_.begin(); it != agents_.end();) {
-//      if (it->second->needDelete_) {
-//        delete it->second;
-//        it = agents_.erase(it);
-//        bDirty = true;
-//      } else {
-//        tempAgentVec.emplace_back(it->second);
-//        ++it;
-//      }
-//    }
+//    agents_.for_each_m([&](phmap::parallel_flat_hash_map<std::size_t, Agent*>::value_type &pair) {
+//        if (pair.second->needDelete_) {
+//            delAgentVec.emplace_back(pair.first);
+//            bDirty = true;
+//        } else {
+//            tempAgentVec.emplace_back(pair.second);
+//        }
+//    });
+    std::lock_guard<std::mutex> lock(agentMutex_);
+    for (auto it = agents_.begin(); it != agents_.end();) {
+      if (it->second->needDelete_) {
+        delete it->second;
+        bDirty = true;
+        it = agents_.erase(it);
+      } else {
+        tempAgentVec.emplace_back(it->second);
+        ++it;
+      }
+    }
 }
 
 std::size_t RVOSimulator::addObstacle(const std::vector<Vector2> &vertices) {
@@ -252,13 +264,13 @@ void RVOSimulator::doStep() {
     tempAgentVec[i]->update(timeStep_);
   }
 
-  for (auto it = delAgentVec.begin(); it != delAgentVec.end(); ++it) {
-        auto pair = agents_.find(*it);
-        if (pair != agents_.end()) {
-            delete pair->second;
-            agents_.erase(*it);
-        }
-  }
+//  for (auto it = delAgentVec.begin(); it != delAgentVec.end(); ++it) {
+//        auto pair = agents_.find(*it);
+//        if (pair != agents_.end()) {
+//            delete pair->second;
+//            agents_.erase(*it);
+//        }
+//  }
 
   globalTime_ += timeStep_;
   bDirty = false;
@@ -266,6 +278,7 @@ void RVOSimulator::doStep() {
 
 std::size_t RVOSimulator::getAgentAgentNeighbor(std::size_t agentNo,
                                                 std::size_t neighborNo) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->agentNeighbors_[neighborNo].second->id_;
@@ -274,6 +287,7 @@ std::size_t RVOSimulator::getAgentAgentNeighbor(std::size_t agentNo,
 }
 
 std::size_t RVOSimulator::getAgentMaxNeighbors(std::size_t agentNo) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->maxNeighbors_;
@@ -282,6 +296,7 @@ std::size_t RVOSimulator::getAgentMaxNeighbors(std::size_t agentNo) const {
 }
 
 float RVOSimulator::getAgentMaxSpeed(std::size_t agentNo) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->maxSpeed_;
@@ -290,6 +305,7 @@ float RVOSimulator::getAgentMaxSpeed(std::size_t agentNo) const {
 }
 
 float RVOSimulator::getAgentNeighborDist(std::size_t agentNo) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->neighborDist_;
@@ -298,6 +314,7 @@ float RVOSimulator::getAgentNeighborDist(std::size_t agentNo) const {
 }
 
 std::size_t RVOSimulator::getAgentNumAgentNeighbors(std::size_t agentNo) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->agentNeighbors_.size();
@@ -307,6 +324,7 @@ std::size_t RVOSimulator::getAgentNumAgentNeighbors(std::size_t agentNo) const {
 
 std::size_t RVOSimulator::getAgentNumObstacleNeighbors(
     std::size_t agentNo) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->obstacleNeighbors_.size();
@@ -315,6 +333,7 @@ std::size_t RVOSimulator::getAgentNumObstacleNeighbors(
 }
 
 std::size_t RVOSimulator::getAgentNumORCALines(std::size_t agentNo) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->orcaLines_.size();
@@ -324,6 +343,7 @@ std::size_t RVOSimulator::getAgentNumORCALines(std::size_t agentNo) const {
 
 std::size_t RVOSimulator::getAgentObstacleNeighbor(
     std::size_t agentNo, std::size_t neighborNo) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->obstacleNeighbors_[neighborNo].second->id_;
@@ -333,6 +353,7 @@ std::size_t RVOSimulator::getAgentObstacleNeighbor(
 
 const Line &RVOSimulator::getAgentORCALine(std::size_t agentNo,
                                            std::size_t lineNo) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->orcaLines_[lineNo];
@@ -341,22 +362,25 @@ const Line &RVOSimulator::getAgentORCALine(std::size_t agentNo,
 }
 
 const Vector2 &RVOSimulator::getAgentPosition(std::size_t agentNo) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->position_;
   }
-  return Vector2();
+  return g_InValidVec2;
 }
 
 const Vector2 &RVOSimulator::getAgentPrefVelocity(std::size_t agentNo) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->prefVelocity_;
   }
-  return Vector2();
+  return g_InValidVec2;
 }
 
 float RVOSimulator::getAgentRadius(std::size_t agentNo) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->radius_;
@@ -365,6 +389,7 @@ float RVOSimulator::getAgentRadius(std::size_t agentNo) const {
 }
 
 float RVOSimulator::getAgentTimeHorizon(std::size_t agentNo) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->timeHorizon_;
@@ -373,6 +398,7 @@ float RVOSimulator::getAgentTimeHorizon(std::size_t agentNo) const {
 }
 
 float RVOSimulator::getAgentTimeHorizonObst(std::size_t agentNo) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->timeHorizonObst_;
@@ -380,12 +406,14 @@ float RVOSimulator::getAgentTimeHorizonObst(std::size_t agentNo) const {
   return 0.0F;
 }
 
-const Vector2 &RVOSimulator::getAgentVelocity(std::size_t agentNo) const {
+const Vector2 &RVOSimulator::getAgentVelocity(std::size_t agentNo, bool & bIsVaild) const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     return it->second->velocity_;
   }
-  return Vector2();
+  bIsVaild = true;
+  return g_InValidVec2;
 }
 
 const Vector2 &RVOSimulator::getObstacleVertex(std::size_t vertexNo) const {
@@ -439,6 +467,7 @@ void RVOSimulator::setAgentDefaults(float neighborDist,
 
 void RVOSimulator::setAgentMaxNeighbors(std::size_t agentNo,
                                         std::size_t maxNeighbors) {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     it->second->maxNeighbors_ = maxNeighbors;
@@ -447,6 +476,7 @@ void RVOSimulator::setAgentMaxNeighbors(std::size_t agentNo,
 }
 
 void RVOSimulator::setAgentMaxSpeed(std::size_t agentNo, float maxSpeed) {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     it->second->maxSpeed_ = maxSpeed;
@@ -455,6 +485,7 @@ void RVOSimulator::setAgentMaxSpeed(std::size_t agentNo, float maxSpeed) {
 
 void RVOSimulator::setAgentNeighborDist(std::size_t agentNo,
                                         float neighborDist) {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     it->second->neighborDist_ = neighborDist;
@@ -463,6 +494,7 @@ void RVOSimulator::setAgentNeighborDist(std::size_t agentNo,
 
 void RVOSimulator::setAgentPosition(std::size_t agentNo,
                                     const Vector2 &position) {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     it->second->position_ = position;
@@ -471,6 +503,7 @@ void RVOSimulator::setAgentPosition(std::size_t agentNo,
 
 void RVOSimulator::setAgentPrefVelocity(std::size_t agentNo,
                                         const Vector2 &prefVelocity) {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     it->second->prefVelocity_ = prefVelocity;
@@ -478,6 +511,7 @@ void RVOSimulator::setAgentPrefVelocity(std::size_t agentNo,
 }
 
 void RVOSimulator::setAgentRadius(std::size_t agentNo, float radius) {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     it->second->radius_ = radius;
@@ -485,6 +519,7 @@ void RVOSimulator::setAgentRadius(std::size_t agentNo, float radius) {
 }
 
 void RVOSimulator::setAgentTimeHorizon(std::size_t agentNo, float timeHorizon) {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     it->second->timeHorizon_ = timeHorizon;
@@ -493,6 +528,7 @@ void RVOSimulator::setAgentTimeHorizon(std::size_t agentNo, float timeHorizon) {
 
 void RVOSimulator::setAgentTimeHorizonObst(std::size_t agentNo,
                                            float timeHorizonObst) {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     it->second->timeHorizonObst_ = timeHorizonObst;
@@ -501,6 +537,7 @@ void RVOSimulator::setAgentTimeHorizonObst(std::size_t agentNo,
 
 void RVOSimulator::setAgentVelocity(std::size_t agentNo,
                                     const Vector2 &velocity) {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     it->second->velocity_ = velocity;
@@ -508,10 +545,15 @@ void RVOSimulator::setAgentVelocity(std::size_t agentNo,
 }
 
 void RVOSimulator::setIsMoving(std::size_t agentNo, bool isMoving) {
+  std::lock_guard<std::mutex> lock(agentMutex_);
   auto it = agents_.find(agentNo);
   if (it != agents_.end()) {
     it->second->isMoving_ = isMoving;
     }
+}
+std::size_t RVOSimulator::getNumAgents() const {
+  std::lock_guard<std::mutex> lock(agentMutex_);
+  return agents_.size();
 }
 
 } /* namespace RVO */
